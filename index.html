@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Il Tuo Ricettario Settimanale</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Fresh Greens & Lively Accents with Frosted Glass Effect -->
+    <!-- Application Structure Plan: La struttura dell'applicazione è ora incentrata sulla visualizzazione diretta delle ricette. Una navigazione a schede (tab) permette di scegliere il giorno della settimana. Ogni ricetta è presentata come una "card" espandibile, che mostra le informazioni essenziali a colpo d'occhio e i dettagli (ingredienti, procedimento) solo su richiesta (click). Questa architettura basata sulla "progressive disclosure" migliora la navigazione, riduce il disordine visivo e promuove l'interazione, rendendo l'esplorazione del piano alimentare più efficiente e coinvolgente. -->
+    <!-- Visualization & Content Choices: Le informazioni qualitative (ricette, procedimenti) sono organizzate in card interattive e aree di testo dinamiche, integrate con funzionalità LLM per suggerimenti e alternative. I grafici sono stati rimossi per un'interfaccia più minimalista e diretta, con un focus sul design visivo dinamico. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        html {
+            /* Hide scrollbar for Webkit browsers (Chrome, Safari) */
+            -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+            overflow-y: scroll; /* Always allow scrolling */
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        html::-webkit-scrollbar {
+            display: none;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            color: #44403c;
+            /* Static multi-color background with subtle gradients */
+            background: linear-gradient(135deg, #e0f2f7, #e8f5e9, #fffde7, #ffe0b2);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh; /* Ensure body takes full viewport height */
+            /* Hide scrollbar for body as well, just in case */
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body::-webkit-scrollbar {
+            display: none;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Merriweather', serif;
+        }
+
+        /* Styling for the header section */
+        header {
+            background-color: #047857; /* Darker emerald green for the header */
+            color: #ffffff; /* Text color for header */
+            padding: 2rem; /* Ample padding */
+            border-radius: 24px; /* Rounded corners */
+            margin-bottom: 2rem; /* Space below the header */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2); /* Stronger shadow */
+            text-align: center; /* Ensure text is centered */
+        }
+
+        header h1 {
+            color: #ffffff; /* Override text-stone-800 for h1 within header */
+            margin-bottom: 0; /* Remove default h1 bottom margin if present */
+        }
+
+        /* Styling for the main planner section background */
+        #planner-main-background {
+            background-color: #D1FAE5; /* A light, fresh green for the planner section */
+            border-radius: 24px; /* Rounded corners for the green rectangle */
+            padding: 2.5rem; /* Increased padding for a more prominent block */
+            margin-bottom: 2rem; /* Space below the section */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+        }
+
+        .nav-button {
+            transition: all 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.4); /* White with 40% opacity */
+            border: 1px solid rgba(255, 255, 255, 0.6); /* Semi-transparent border */
+            backdrop-filter: blur(10px); /* Frosted glass effect */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+        .nav-button.active {
+            background-color: #059669; /* emerald-600 */
+            color: #ffffff;
+            font-weight: 700;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border-color: #047857; /* Darker emerald border for active */
+        }
+        .nav-button:hover:not(.active) {
+            background-color: rgba(255, 255, 255, 0.6); /* More opaque on hover */
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: translateY(-2px); /* Slight lift on hover */
+        }
+        .recipe-card {
+            transition: all 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.4); /* White with 40% opacity */
+            border: 1px solid rgba(255, 255, 255, 0.7); /* Semi-transparent border */
+            backdrop-filter: blur(12px); /* Frosted glass effect */
+            border-radius: 24px; /* rounded-3xl equivalent, more rounded */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15); /* More pronounced initial shadow */
+        }
+        .recipe-card:hover {
+            transform: translateY(-5px); /* Lift effect */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.25); /* Stronger shadow on hover */
+            background-color: rgba(255, 255, 255, 0.5); /* Slightly more opaque on hover */
+        }
+        /* No longer need recipe-card-details styling, as it's a modal now */
+        .recipe-card-header {
+            cursor: pointer; /* Ensure the whole header is clickable */
+        }
+        .recipe-card-header:hover {
+            background-color: transparent; /* Prevent conflict with card hover */
+        }
+
+        /* Modal for detailed recipe view */
+        #recipeDetailModal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4); /* Dark overlay - instant opacity */
+            backdrop-filter: blur(8px); /* Blur the background content - instant blur */
+            z-index: 1000; /* Above everything else */
+            justify-content: center;
+            align-items: center;
+            /* No opacity, transform, or transition here for instant background */
+        }
+
+        #recipeDetailModal.show {
+            display: flex; /* Show the overlay instantly */
+        }
+
+        #recipeDetailModal .modal-content {
+            background-color: rgba(255, 255, 255, 0.85); /* Frosted glass for modal content */
+            backdrop-filter: blur(15px); /* Stronger blur for content */
+            border-radius: 24px;
+            padding: 2rem;
+            max-width: 700px; /* Increased max-width for better readability */
+            width: 90%;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            position: relative; /* Needed for positioning scroll indicator inside */
+            max-height: 90vh;
+            overflow-y: scroll; /* Keep scroll for content, hide scrollbar */
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+            border: 1px solid rgba(255, 255, 255, 0.9);
+
+            /* Initial state for content (hidden and small) */
+            opacity: 0;
+            transform: scale(0.0);
+            /* Transition for content - 0.25s as requested */
+            transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+
+            /* Removed mask-image from here */
+        }
+        /* Hide scrollbar for Webkit browsers */
+        #recipeDetailModal .modal-content::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* When the modal container has 'show', apply final state to its its content */
+        #recipeDetailModal.show .modal-content {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Styling for the procedure text to respect newlines */
+        #recipeDetailModal .modal-content #recipeDetailProcedure {
+            white-space: pre-wrap; /* Ensures newlines in the string are rendered as actual line breaks */
+        }
+
+        /* Scroll Indicator */
+        #scrollIndicator {
+            /* Position: fixed relative to the viewport (as parent recipeDetailModal is fixed) */
+            position: fixed; 
+            width: 40px;
+            height: 40px;
+            background-color: rgba(5, 150, 105, 0.8); /* emerald-600 with opacity */
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* No 'color: white' here as the arrow is a pseudo-element */
+            cursor: pointer;
+            /* Gaussian-like shadow for the indicator itself - reduced radius */
+            box-shadow: 0 0 4px 1px rgba(5, 150, 105, 0.6); 
+            transition: opacity 0.3s ease-out; /* Smooth fade for the indicator itself */
+            z-index: 1001; /* Above modal content */
+            /* top and left will be set by JavaScript dynamically */
+            opacity: 0; /* Hidden by default */
+            pointer-events: none; /* Disable interaction when hidden */
+        }
+        /* Make indicator visible when modal-content is hovered */
+        #recipeDetailModal.show .modal-content:hover ~ #scrollIndicator {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #scrollIndicator.hidden {
+            opacity: 0 !important; /* Use !important to ensure it overrides hover effect */
+            pointer-events: none !important;
+        }
+        /* Style for the 'V' arrow using ::after pseudo-element */
+        #scrollIndicator::after { 
+            content: '';
+            display: block;
+            width: 10px; /* Adjust width to make the V wider/narrower */
+            height: 10px; /* Adjust height to make the V taller/shorter */
+            border-bottom: 2px solid white; /* The bottom-left leg of the V */
+            border-right: 2px solid white; /* The bottom-right leg of the V */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(45deg); /* Rotates the square with two borders into a V */
+            box-sizing: border-box; /* Ensure border-box model for width/height */
+        }
+
+
+        /* Close button styling */
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 40px; /* Made larger as requested */
+            font-weight: bold;
+            cursor: pointer;
+            position: absolute;
+            top: 10px; /* Adjusted position */
+            right: 20px; /* Adjusted position */
+            transition: color 0.2s ease;
+            z-index: 1002; /* Ensure it's above everything */
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #44403c;
+            text-decoration: none;
+        }
+
+        /* Modal for alternative recipes (existing) - also instant background/blur */
+        #alternativeRecipeModal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5); /* Instant background */
+            backdrop-filter: blur(8px); /* Instant blur */
+            justify-content: center;
+            align-items: center;
+            /* No opacity, transform, or transition here for instant background */
+        }
+
+        #alternativeRecipeModal.show {
+            display: flex;
+        }
+
+        #alternativeRecipeModal .modal-content {
+            background-color: rgba(255, 255, 255, 0.8); /* Frosted glass effect for modal */
+            backdrop-filter: blur(10px);
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.9); /* Border for modal */
+
+            /* Initial state for content */
+            opacity: 0;
+            transform: scale(0.95); /* It was scaling from 0.95 to 1, keep this for consistency */
+            /* Transition for content */
+            transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+        }
+
+        #alternativeRecipeModal.show .modal-content {
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        /* Ensure table header has white background for frosted glass effect */
+        .modal-content table thead tr {
+             background-color: rgba(243, 244, 246, 0.7) !important; /* bg-stone-100 with opacity */
+        }
+        .modal-content table tbody tr {
+             background-color: rgba(255, 255, 255, 0.7) !important; /* bg-white with opacity */
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-7xl relative z-10"> <!-- Content over background -->
+
+        <header>
+            <h1 class="text-4xl sm:text-5xl font-bold">Ricettario Settimanale</h1>
+        </header>
+
+        <section id="planner-main-background"> <!-- New container for green background -->
+            <nav id="day-navigation" class="flex flex-wrap justify-center gap-2 mb-12">
+            </nav>
+
+            <div id="recipe-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
+            </div>
+        </section>
+        
+        <footer class="text-center mt-16 pt-8 border-t border-stone-200">
+            <p class="text-stone-500">Ricettario generato per te. Buon appetito e buon percorso!</p>
+        </footer>
+
+        <!-- Modal for single recipe detail -->
+        <div id="recipeDetailModal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h3 id="recipeDetailTitle" class="text-xl font-bold mb-4 text-stone-800"></h3>
+                <p id="recipeDetailKcal" class="text-sm text-emerald-700 font-semibold mb-4"></p>
+                <!-- Moved image here as requested -->
+                <img id="recipeDetailImage" alt="Immagine ricetta" class="w-full h-64 object-cover rounded-lg mb-4 mt-4">
+                
+                <h5 class="font-bold mb-2 text-stone-700">Ingredienti:</h5>
+                <ul id="recipeDetailIngredients" class="list-disc list-inside text-stone-600 mb-4">
+                </ul>
+                <h5 class="font-bold mb-2 text-stone-700">Procedimento:</h5>
+                <p id="recipeDetailProcedure" class="text-stone-600 mb-4"></p>
+                <h5 class="font-bold mb-2 text-stone-700">Valori Nutrizionali:</h5>
+                <table class="w-full text-sm text-left text-stone-500 mb-4">
+                    <thead class="text-xs text-stone-700 uppercase bg-stone-100">
+                        <tr>
+                            <th scope="col" class="px-2 py-1">Proteine (g)</th>
+                            <th scope="col" class="px-2 py-1">Carboidrati (g)</th>
+                            <th scope="col" class="px-2 py-1">Grassi (g)</th>
+                            <th scope="col" class="px-2 py-1">Fibre (g)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="bg-white">
+                            <td id="recipeDetailProtein" class="px-2 py-1 font-medium"></td>
+                            <td id="recipeDetailCarbs" class="px-2 py-1 font-medium"></td>
+                            <td id="recipeDetailFats" class="px-2 py-1 font-medium"></td>
+                            <td id="recipeDetailFibre" class="px-2 py-1 font-medium"></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <h5 class="font-bold mb-2 text-stone-700">Micronutrienti Chiave:</h5>
+                <p id="recipeDetailMicros" class="text-sm text-stone-600 mb-4"></p>
+                <button id="suggestAlternativeBtnModal" class="w-full px-4 py-2 rounded-lg bg-yellow-600 text-white font-semibold hover:bg-yellow-700 transition-colors duration-200">
+                    Suggerisci Ricetta Alternativa ✨
+                </button>
+            </div>
+            <!-- Scroll indicator moved outside modal-content but within recipeDetailModal -->
+            <div id="scrollIndicator" class="hidden"></div>
+        </div>
+
+        <!-- Modal for alternative recipe (existing) -->
+        <div id="alternativeRecipeModal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h3 class="text-xl font-bold mb-4 text-stone-800">Ricetta Alternativa Suggerita ✨</h3>
+                <div id="alternativeRecipeContent" class="text-stone-600">
+                    <p>Caricamento...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // Helper function to format procedure text with newlines
+    function formatProcedureText(text) {
+        // Splits sentences by recognizing common punctuation (. ! ?) followed by whitespace and a capital letter
+        // This creates logical paragraph breaks.
+        return text.replace(/([.!?])\s*(?=[A-Z])/g, '$1\n\n');
+    }
+
+    // Fallback placeholder image URLs
+    const PLACEHOLDER_IMG_SMALL = 'https://placehold.co/80x80/rgba(255,255,255,0.6)/44403c?text=Img';
+    const PLACEHOLDER_IMG_LARGE = 'https://placehold.co/600x300/rgba(255,255,255,0.6)/44403c?text=Ricetta';
+
+    const mealPlan = {
+        "Lunedì": [
+            { title: "Porridge Energetico con Frutti Rossi e Noci", image: "images/lunedì_ricetta1.jpg", kcal: 350, p: 18, c: 45, g: 12, f: 8, ingredients: ["Fiocchi d'avena: 50g", "Latte (vaccino o vegetale): 200ml", "Frutti rossi misti: 100g", "Noci tritate: 15g", "Miele (opzionale): 1 cucchiaino"], shortProcedure: "In un pentolino, scalda il latte. Aggiungi i fiocchi d'avena e cuoci a fuoco basso per 5-7 minuti. Versa in una ciotola, aggiungi i frutti rossi e le noci.", fullProcedure: formatProcedureText("In un pentolino, porta a ebollizione il latte. Aggiungi i fiocchi d'avena, riduci la fiamma al minimo e cuoci per circa 5-7 minuti, mescolando frequentemente, fino a quando il porridge non avrà raggiunto una consistenza densa e cremosa. Se preferisci una consistenza più liquida, aggiungi un po' più di latte. Togli dal fuoco e versa il porridge in una ciotola. Incorpora i frutti rossi (se surgelati, lasciali scongelare leggermente prima o aggiungili direttamente nel pentolino negli ultimi minuti di cottura). Guarnisci con le noci tritate. Se desiderato, aggiungi un cucchiaino di miele o sciroppo d'acero per dolcificare."), micros: "Manganese, Fosforo, Magnesio, Vitamina B, Antiossidanti." },
+            { title: "Insalata Ricca di Pollo e Ceci", image: "images/lunedì_ricetta2.jpg", kcal: 450, p: 40, c: 35, g: 18, f: 10, ingredients: ["Petto di pollo grigliato: 150g", "Ceci cotti: 150g", "Lattuga mista: 100g", "Pomodorini: 100g", "Cetriolo: 50g", "Olive: 20g", "Olio EVO: 2 cucchiai", "Succo di limone: 1 cucchiaio"], shortProcedure: "Taglia il pollo a listarelle. In una ciotola, unisci tutti gli ingredienti solidi. Condisci con olio, succo di limone e erbe aromatiche.", fullProcedure: formatProcedureText("Griglia il petto di pollo finché non è cotto e dorato. Lascialo raffreddare leggermente e taglialo a listarelle o cubetti. Lava e taglia a metà i pomodorini. Lava e taglia il cetriolo a rondelle o cubetti. In una grande ciotola, unisci la lattuga mista, i ceci, i pomodorini, il cetriolo e le olive. Addiungi il pollo. In una piccola ciotola, prepara il condimento emulsionando l'olio extra vergine d'oliva con il succo di limone, le erbe aromatiche tritate, sale e pepe. Versa il condimento sull'insalata e mescola delicatamente per amalgamare tutti gli ingredienti."), micros: "Ferro, Folati, Vitamina C, Potassio." },
+            { title: "Yogurt Greco con Mirtilli e Mandorle", image: "images/lunedì_ricetta3.jpg", kcal: 150, p: 15, c: 10, g: 6, f: 2, ingredients: ["Yogurt greco 0%: 150g", "Mirtilli: 50g", "Mandorle a lamelle: 10g"], shortProcedure: "In una ciotola, metti lo yogurt greco. Aggiungi i mirtilli e le mandorre a lamelle.", fullProcedure: formatProcedureText("In una ciotola o in un bicchiere, versa lo yogurt greco. Addiungi i mirtilli freschi. Spolvera con le mandorle a lamelle. Mescola delicatamente e gusta."), micros: "Calcio, Probiotici, Antiossidanti." },
+            { title: "Petto di Pollo al Limone con Quinoa e Broccoli", image: "images/lunedì_ricetta4.jpg", kcal: 650, p: 55, c: 60, g: 20, f: 12, ingredients: ["Petto di pollo: 200g", "Quinoa: 100g", "Broccoli: 200g", "Limone: 1/2", "Olio EVO: 1 cucchiaio", "Aglio: 1 spicchio"], shortProcedure: "Cuoci la quinoa e i broccoli al vapore. Cuoci il pollo in padella con olio e aglio, poi sfuma con il limone. Servi tutto insieme.", fullProcedure: formatProcedureText("Sciacqua bene la quinoa sotto acqua corrente. Cuocila secondo le istruzioni sulla confezione (solitamente 1 parte di quinoa per 2 parti di acqua, bollire per 15-20 minuti finché l'acqua non è assorbita). Dividi i broccoli in cimette e cuocili al vapore finché non sono teneri ma ancora croccanti (circa 5-7 minuti). Taglia il petto di pollo a bocconcini o striscioline. In una padella antiaderente, scalda l'olio extra vergine d'oliva con lo spicchio d'aglio leggermente schiacciato (che poi toglierai). Aggiungi il pollo e cuocilo a fuoco medio-alto fino a doratura su tutti i lati. Spremile il succo di mezzo limone sul pollo e aggiungi la scorza grattugiata. Continua a cuocere per un paio di minuti, mescolando. Impiatta la quinoa, il pollo al limone e i broccoli. Spolvera con prezzemolo fresco tritato."), micros: "Vitamina C, Folati, Potassio, Proteine complete." }
+        ],
+        "Martedì": [
+            { title: "Smoothie Proteico Tropicale", image: "images/martedì_ricetta1.jpg", kcal: 300, p: 25, c: 35, g: 8, f: 7, ingredients: ["Proteine in polvere: 30g", "Latte: 200ml", "Mango: 80g", "Ananas: 80g", "Spinaci: 50g"], shortProcedure: "Metti tutti gli ingredienti in un frullatore e frulla fino ad ottenere una consistenza liscia.", fullProcedure: formatProcedureText("Metti tutti gli ingredienti in un frullatore. Frulla ad alta velocità fino ad ottenere una consistenza liscia e omogenea. Se troppo denso, aggiungi un po' più di latte o acqua. Versa in un bicchiere e gusta immediatamente."), micros: "Vitamina C, Vitamina K, Manganese." },
+            { title: "Fagioli Neri e Riso Integrale con Verdure", image: "images/martedì_ricetta2.jpg", kcal: 480, p: 22, c: 70, g: 12, f: 15, ingredients: ["Fagioli neri cotti: 150g", "Riso integrale cotto: 150g", "Peperoni misti: 100g", "Cipolla: 50g", "Mais: 50g", "Olio EVO: 1 cucchiaio"], shortProcedure: "Salta le verdure in padella con olio e spezie. Aggiungi fagioli e mais, poi servi con il riso.", fullProcedure: formatProcedureText("Se non hai riso integrale cotto, cuocilo secondo le istruzioni sulla confezione. Taglia i peperoni e la cipolla a listarelle sottili. In una padella capiente, scalda l'olio extra vergine d'oliva a fuoco medio. Aggiungi la cipolla e falla appassire per 3-4 minuti. Aggiungi i peperoni e le spezie. Cuoci per altri 5-7 minuti, finché i peperoni non saranno teneri ma ancora leggermente croccanti. Aggiungi i fagioli neri e il mais. Mescola bene e cuoci per 2-3 minuti, solo per riscaldare il tutto. Servi le verdure con i fagioli sul riso integrale. Aggiusta di sale e pepe."), micros: "Ferro, Magnesio, Fibre." },
+            { title: "Mela e Burro d'Arachidi", image: "images/martedì_ricetta3.jpg", kcal: 170, p: 5, c: 20, g: 9, f: 4, ingredients: ["Mela: 1 media", "Burro d'arachidi (100%): 2 cucchiaini"], shortProcedure: "Taglia la mela a spicchi e spalmaci sopra il burro d'arachidi.", fullProcedure: formatProcedureText("Lava bene la mela e tagliala a spicchi. Spalma il burro d'arachidi su ogni spicchio di mela."), micros: "Vitamina C, Fibre, Grassi sani." },
+            { title: "Macinato di Manzo Magro con Patate Dolci", image: "images/martedì_ricetta4.jpg", kcal: 650, p: 50, c: 65, g: 22, f: 10, ingredients: ["Macinato di manzo magro: 200g", "Patate dolci: 200g", "Asparagi: 200g", "Cipolla: 50g", "Olio EVO: 1 cucchiaio"], shortProcedure: "Cuoci patate dolci e asparagi al forno. In padella, cuoci la cipolla e poi il macinato. Servi tutto insieme.", fullProcedure: formatProcedureText("Preriscalda il forno a 200°C (ventilato). Sbuccia le patate dolci e tagliale a cubetti di circa 2 cm. Lava gli asparagi e tagliali eliminando la parte finale più dura. Disponi le patate dolci e gli asparagi su una teglia rivestita di carta forno. Condisci con un filo d'olio extra vergine d'oliva, sale, pepe e un rametto di rosmarino o timo. Inforna per circa 20-25 minuti, o finché le patate non sono tenere e leggermente dorate. Nel frattempo, trita finemente la cipolla. In una padella antiaderente, scalda un cucchiaino di olio extra vergine d'oliva. Aggiungi la cipolla e falla appassire per 3-4 minuti. Aggiungi il macinato di manzo nella padella e rompi la carne con un cucchiaio di legno. Cuocila a fuoco medio-alto fino a quando non sarà completamente dorata e cotta. Condisci con sale e pepe. Impiatta il macinato di manzo con le patate dolci e gli asparagi al forno."), micros: "Ferro, Zinco, Vitamina A." }
+        ],
+        "Mercoledì": [
+             { title: "Toast Integrale con Avocado e Uova Strapazzate", image: "images/mercoledì_ricetta1.jpg", kcal: 380, p: 20, c: 30, g: 20, f: 6, ingredients: ["Pane integrale: 2 fette", "Avocado: 1/2", "Uova: 2"], shortProcedure: "Tosta il pane, spalma l'avocado schiacciato e copri con le uova strapazzate.", fullProcedure: formatProcedureText("Tosta il pane integrale in tostapane o in una padella antiaderente finché non è dorato e croccante. Nel frattempo, apri l'avocado, rimuovi il nocciolo e la polpa. Schiaccia la polpa con una forchetta in una piccola ciotola, aggiustando di sale e pepe. In una ciotola, sbatti le uova con una piccola presa di sale e pepe. Scalda un cucchiaino di olio extra vergine d'oliva in una padella antiaderente a fuoco medio-basso. Versa le uova sbattute e mescola continuamente con una spatola finché non si saranno strapazzate e cotte a tuo piacimento. Spalma l'avocado schiacciato sui toast tostati. Adagia le uova strapazzate sopra l'avocado. Se ti piace, spolvera con fiocchi di peperoncino per un tocco in più."), micros: "Grassi sani, Vitamina E, Folati." },
+             { title: "Zuppa di Lenticchie e Verdure", image: "images/mercoledì_ricetta2.jpg", kcal: 420, p: 25, c: 50, g: 12, f: 18, ingredients: ["Lenticchie: 100g", "Carote, sedano, cipolla: 180g", "Pomodori pelati: 200g", "Pane integrale: 1 fetta"], shortProcedure: "Prepara un soffritto, aggiungi lenticchie e pomodori e cuoci finché le lenticchie sono tenere. Servi con pane.", fullProcedure: formatProcedureText("Sciacqua bene le lenticchie sotto acqua corrente. Non è necessario ammollarle se usi lenticchie rosse o marroni. Trita finemente carote, sedano e cipolla per preparare un soffritto. In una pentola capiente, scalda l'olio extra vergine d'oliva. Aggiungi il trito di verdure (e l'aglio) e fallo appassire a fuoco medio-basso per 5-7 minuti. Aggiungi le lenticchie sciacquate, i pomodori pelati e il brodo vegetale (o acqua). Se usi rosmarino o alloro, aggiungili ora. Porta a ebollizione, poi riduci la fiamma, copri e lascia sobbollire per circa 20-30 minuti, o finché le lenticchie non sono tenere. Aggiungi più brodo se necessario per la consistenza desiderata. Aggiusta di sale e pepe. Togli il rametto di rosmarino/alloro prima di servire. Servi la zuppa calda con una fetta di pane integrale."), micros: "Ferro, Fibre, Proteine vegetali." },
+             { title: "Pera e Ricotta Magra", image: "images/mercoledì_ricetta3.jpg", kcal: 150, p: 12, c: 18, g: 4, f: 3, ingredients: ["Pera: 1 media", "Ricotta magra: 100g"], shortProcedure: "Taglia la pera a spicchi e servila con la ricotta.", fullProcedure: formatProcedureText("Lava bene la pera. Tagliala a spicchi o cubetti. In una ciotola, metti la ricotta magra. Accompagna la ricotta con gli spicchi di pera. Puoi gustarli alternandoli o mescolandoli."), micros: "Calcio, Fibre." },
+             { title: "Fesa di Tacchino con Riso Basmati e Zucchine", image: "images/mercoledì_ricetta4.jpg", kcal: 650, p: 55, c: 60, g: 20, f: 10, ingredients: ["Fesa di tacchino: 200g", "Riso basmati: 100g", "Zucchine: 200g", "Olio EVO: 1 cucchiaio"], shortProcedure: "Cuoci il riso. Salta le zucchine e cuoci il tacchino in padella. Servi tutto insieme.", fullProcedure: formatProcedureText("Cuoci il riso basmati secondo le istruzioni sulla confezione (solitamente 1 parte di riso per 2 parti di acqua, bollire per 10-12 minuti). Lava le zucchine e tagliale a rondelle o a mezzelune. In una padella antiaderente, scalda l'olio extra vergine d'oliva con lo spicchio d'aglio leggermente schiacciato. Aggiungi le zucchine e saltale a fuoco medio-alto per 7-10 minuti, finché non saranno tenere e leggermente dorate. Aggiusta di sale e pepe. Nella stessa padella (o in un'altra), cuoci le fettine di fesa di tacchino a fuoco medio-alto per 3-4 minuti per lato, finché non saranno dorate e cotte. Aggiusta di sale e pepe. Puoi tagliarle a bocconcini se preferisci. Impiatta il riso basmati, la fesa di tacchino e le zucchine saltate. Spolvera con erbe aromatiche fresche tritate."), micros: "Selenio, Vitamina B, Potassio." }
+        ],
+        "Giovedì": [
+            { title: "Porridge Energetico con Frutti Rossi e Noci", image: "images/giovedì_ricetta1.jpg", kcal: 350, p: 18, c: 45, g: 12, f: 8, ingredients: ["Fiocchi d'avena: 50g", "Latte (vaccino o vegetale): 200ml", "Frutti rossi misti: 100g", "Noci tritate: 15g"], shortProcedure: "In un pentolino, scalda il latte. Aggiungi i fiocchi d'avena e cuoci a fuoco basso per 5-7 minuti. Versa in una ciotola, aggiungi i frutti rossi e le noci.", fullProcedure: formatProcedureText("In un pentolino, porta a ebollizione il latte. Aggiungi i fiocchi d'avena, riduci la fiamma al minimo e cuoci per circa 5-7 minuti, mescolando frequentemente, fino a quando il porridge non avrà raggiunto una consistenza densa e cremosa. Se preferisci una consistenza più liquida, aggiungi un po' più di latte. Togli dal fuoco e versa il porridge in una ciotola. Incorpora i frutti rossi (se surgelati, lasciali scongelare leggermente prima o aggiungili direttamente nel pentolino negli ultimi minuti di cottura). Guarnisci con le noci tritate. Se desiderato, aggiungi un cucchiaino di miele o sciroppo d'acero per dolcificare."), micros: "Manganese, Fosforo, Magnesio." },
+            { title: "Insalata di Ceci, Mais e Peperoni", image: "images/giovedì_ricetta2.jpg", kcal: 450, p: 20, c: 55, g: 18, f: 15, ingredients: ["Ceci cotti: 150g", "Mais: 100g", "Peperoni misti: 100g", "Cipolla rossa: 50g", "Olio EVO: 2 cucchiai"], shortProcedure: "Mescola tutti gli ingredienti in una ciotola e condisci a piacere.", fullProcedure: formatProcedureText("Lava i peperoni, rimuovi il torsolo e i semi, e tagliali a listarelle sottili o a cubetti. Sbuccia la cipolla rossa e tagliala a fettine sottili o a cubetti molto piccoli. In una ciotola capiente, unisci i ceci, il mais, i peperoni e la cipolla rossa. Prepara il condimento emulsionando l'olio extra vergine d'oliva con il succo di limone, il prezzemolo tritato, sale e pepe. Versa il condimento sull'insalata e mescola bene per amalgamare tutti gli ingredienti."), micros: "Vitamina C, Fibre, Folati." },
+            { title: "Gallette di Riso con Hummus", image: "images/giovedì_ricetta3.jpg", kcal: 150, p: 5, c: 25, g: 6, f: 3, ingredients: ["Gallette di riso: 3", "Hummus: 50g"], shortProcedure: "Spalma l'hummus sulle gallette di riso.", fullProcedure: formatProcedureText("Prendi le gallette di riso. Spalma uniformemente l'hummus su ciascuna galletta. Consuma come spuntino."), micros: "Fibre, Ferro." },
+            { title: "Polpette al Sugo con Spaghetti Integrali", image: "images/giovedì_ricetta4.jpg", kcal: 650, p: 50, c: 65, g: 22, f: 10, ingredients: ["Carne macinata magra: 200g", "Spaghetti integrali: 100g", "Pomodori pelati: 400g", "Soffritto misto: 80g", "Uovo: 1", "Pangrattato: 20g"], shortProcedure: "Prepara le polpette con carne, uovo e pangrattato. Cuocile in un sugo di pomodoro preparato con il soffritto. Servi con gli spaghetti integrali cotti.", fullProcedure: formatProcedureText("Prepara le polpette: In una ciotola, mescola la carne macinata con l'uovo, il pangrattato, sale e pepe. Amalgama bene e forma circa 8-10 polpette di medie dimensioni. Prepara il sugo: Trita finemente cipolla, carota e sedano (soffritto). Se usi l'aglio, schiaccialo leggermente. In una pentola capiente, scalda l'olio extra vergine d'oliva. Aggiungi il trito di verdure (e l'aglio) e fai soffriggere a fuoco basso per 5-7 minuti finché non sono morbide. Aggiungi i pomodori pelati al soffritto. Schiacciali con una forchetta se sono interi. Porta a ebollizione, poi reduci la fiamma, copri e lascia sobbollire per 15-20 minuti per far insaporire. Aggiungi delicatamente le polpette nel sugo e lasciale cuocere per circa 15-20 minuti, girandole occasionalmente, finché non sono ben cotte all'interno. Aggiusta di sale e pepe. Aggiungi qualche foglia di basilico fresco negli ultimi minuti. Nel frattempo, cuoci gli spaghetti integrali in abbondante acqua salata seguendo le istruzioni sulla confezione. Scolali al dente. Servi le polpette con il sugo e gli spaghetti."), micros: "Ferro, Vitamina B12, Licopene." }
+        ],
+        "Venerdì": [
+            { title: "Smoothie Proteico Tropicale", image: "images/venerdì_ricetta1.jpg", kcal: 300, p: 25, c: 35, g: 8, f: 7, ingredients: ["Proteine in polvere: 30g", "Latte: 200ml", "Mango: 80g", "Ananas: 80g", "Spinaci: 50g"], shortProcedure: "Metti tutti gli ingredienti in un frullatore e frulla fino ad ottenere una consistenza liscia.", fullProcedure: formatProcedureText("Metti tutti gli ingredienti in un frullatore. Frulla ad alta velocità fino ad ottenere una consistenza liscia e omogenea. Se troppo denso, aggiungi un poco più di latte o acqua. Versa in un bicchiere e gusta immediatamente."), micros: "Vitamina C, Vitamina K, Manganese." },
+            { title: "Pollo Grigliato con Patate e Spinaci", image: "images/venerdì_ricetta2.jpg", kcal: 480, p: 45, c: 45, g: 15, f: 8, ingredients: ["Petto di pollo: 200g", "Patate: 200g", "Spinaci freschi: 200g", "Olio EVO: 1 cucchiaio"], shortProcedure: "Griglia il pollo, lessa le patate e salta gli spinaci in padella. Servi tutto insieme.", fullProcedure: formatProcedureText("Lava le patate e lessale in acqua bollente salata con la buccia finché non sono tenere (circa 20-25 minuti, a seconda della dimensione). Sbucciale e tagliate a pezzi. Lava gli spinaci. Puoi cuocerli al vapore o saltarli brevemente in padella con un filo d'acqua o un cucchiaino di olio, finché non appassiscono. Griglia il petto di pollo su una piastra calda o in una padella antiaderente per circa 4-5 minuti per lato, o finché non è completamente cotto e presenta delle belle striature. Aggiusta di sale e pepe. Impiatta il petto di pollo grigliato, le patate lessate e gli spinaci. Condisci le verdure con un filo d'olio extra vergine d'oliva e una spruzzata di succo di limone."), micros: "Vitamina C, Ferro, Potassio." },
+            { title: "Yogurt Greco con Mirtilli e Mandorle", image: "images/venerdì_ricetta3.jpg", kcal: 150, p: 15, c: 10, g: 6, f: 2, ingredients: ["Yogurt greco 0%: 150g", "Mirtilli: 50g", "Mandorle a lamelle: 10g"], shortProcedure: "In una ciotola, metti lo yogurt greco. Aggiungi i mirtilli e le mandorre a lamelle.", fullProcedure: formatProcedureText("In una ciotola o in un bicchiere, versa lo yogurt greco. Addiungi i mirtilli freschi. Spolvera con le mandorle a lamelle. Mescola delicatamente e gusta."), micros: "Calcio, Probiotici, Antiossidanti." },
+            { title: "Frittata di Verdure Miste con Pane di Segale", image: "images/venerdì_ricetta4.jpg", kcal: 670, p: 40, c: 50, g: 35, f: 10, ingredients: ["Uova: 3", "Verdure miste: 200g", "Parmigiano: 20g", "Olio EVO: 1 cucchiaio", "Pane di segale: 2 fette"], shortProcedure: "Salta le verdure in padella. Sbatti le uova con il parmigiano, aggiungi le verdure e cuoci la frittata. Servi con il pane.", fullProcedure: formatProcedureText("Lava le verdure e tagliale a cubetti o a striscioline. In una padella antiaderente, scalda un cucchiaino di olio extra vergine d'oliva e salta le verdure per 7-10 minuti, finché non sono tenere. Aggiusta di sale e pepe. In una ciotola, sbatti le uova con il Parmigiano grattugiato, sale, pepe e le erbe aromatiche. Aggiungi le verdure cotte alle uova e mescola bene. Scalda il restante olio extra vergine d'oliva nella stessa padella (o in un'altra, se necessario). Versa il composto di uova e verdure. Cuoci a fuoco medio-basso per circa 5-7 minuti, o finché i bordi non si solidificano. Puoi coprire la padella con un coperchio per aiutare la cottura superiore. Gira la frittata (aiutandoti con un piatto) e cuocila sull'altro lato per altri 3-5 minuti, finché non sarà dorata e cotta all'interno. Servi la frittata calda o tiepida con le fette di pane di segale."), micros: "Calcio, Vitamina A, Fibre." }
+        ],
+        "Sabato": [
+            { title: "Toast Integrale con Avocado e Uova Strapazzate", image: "images/sabato_ricetta1.jpg", kcal: 380, p: 20, c: 30, g: 20, f: 6, ingredients: ["Pane integrale: 2 fette", "Avocado: 1/2", "Uova: 2"], shortProcedure: "Tosta il pane, spalma l'avocado schiacciato e copri con le uova strapazzate.", fullProcedure: formatProcedureText("Tosta il pane integrale in tostapane o in una padella antiaderente finché non è dorato e croccante. Nel frattempo, apri l'avocado, rimuovi il nocciolo e la polpa. Schiaccia la polpa con una forchetta in una piccola ciotola, aggiustando di sale e pepe. In una ciotola, sbatti le uova con una piccola presa di sale e pepe. Scalda un cucchiaino di olio extra vergine d'oliva in una padella antiaderente a fuoco medio-basso. Versa le uova sbattute e mescola continuamente con una spatola finché non si saranno strapazzate e cotte a tuo piacimento. Spalma l'avocado schiacciato sui toast tostati. Adagia le uova strapazzate sopra l'avocado. Se ti piace, spolvera con fiocchi di peperoncino per un tocco in più."), micros: "Grassi sani, Vitamina E, Folati." },
+            { title: "Insalata di Fagioli Cannellini e Pomodorini", image: "images/sabato_ricetta2.jpg", kcal: 420, p: 20, c: 50, g: 15, f: 12, ingredients: ["Fagioli cannellini cotti: 150g", "Pomodorini: 150g", "Rucola: 50g", "Cipolla rossa: 50g", "Olio EVO: 2 cucchiai"], shortProcedure: "Mescola tutti gli ingredienti in una ciotola e condisci a piacere.", fullProcedure: formatProcedureText("Lava i pomodorini e tagliali a metà o in quarti. Sbuccia la cipolla rossa e tagliala a fettine sottili o a cubetti molto piccoli. Lava la rucola e asciugala bene. In una ciotola capiente, unisci i fagioli cannellini, i pomodorini, la rucola e la cipolla rossa. Prepara il condimento emulsionando l'olio extra vergine d'oliva con l'aceto balsamico, l'origano, sale e pepe. Versa il condimento sull'insalata e mescola delicatamente per amalgamare tutti gli ingredienti."), micros: "Ferro, Vitamina C, Fibre." },
+            { title: "Mela e Burro d'Arachidi", image: "images/sabato_ricetta3.jpg", kcal: 170, p: 5, c: 20, g: 9, f: 4, ingredients: ["Mela: 1 media", "Burro d'arachidi (100%): 2 cucchiaini"], shortProcedure: "Taglia la mela a spicchi e spalmaci sopra il burro d'arachidi.", fullProcedure: formatProcedureText("Lava bene la mela e tagliala a spicchi. Spalma il burro d'arachidi su ogni spicchio di mela."), micros: "Vitamina C, Fibre, Grassi sani." },
+            { title: "Cotoletta al Forno con Purè di Cavolfiore", image: "images/sabato_ricetta4.jpg", kcal: 630, p: 50, c: 55, g: 25, f: 10, ingredients: ["Petto di pollo: 200g", "Pangrattato integrale: 30g", "Uovo: 1", "Cavolfiore: 200g", "Carote: 200g"], shortProcedure: "Impana il pollo con uovo e pangrattato e cuocilo al forno. Prepara un purè con il cavolfiore cotto e servi con carote al vapore.", fullProcedure: formatProcedureText("Preriscalda il forno a 180°C (ventilato). Batti leggermente il petto di pollo per renderlo uniforme. Passalo nell'uovo sbattuto, poi nel pangrattato, premendo bene per farlo aderire. Metti la cotoletta su una teglia rivestita di carta forno, irrora con un filo d'olio e cuoci in forno per circa 15-20 minuti, girandola a metà cottura, finché non sarà dorata e croccante. Per il purè di cavolfiore: Lava il cavolfiore, dividilo in cimette e cuocilo al vapore o lessalo in acqua bollente salata finché non è molto tenero (circa 10-15 minuti). Scolalo bene. Trasferisci il cavolfiore in una ciotola, aggiungi il latte caldo, un pizzino di sale e noce moscata (se gradita). Schiaccia con una forchetta o frulla con un frullatore a immersione fino ad ottenere un purè liscio. Per le carote al vapore: Sbuccia le carote e tagliale a rondelle o a bastoncini. Cuocile al vapore o lessale finché non sono tenere ma ancora leggermente consistenti (circa 5-7 minuti). Condiscile con un filo d'olio extra vergine d'oliva e sale. Impiatta la cotoletta di pollo al forno con il purè di cavolfiore e le carote al vapore."), micros: "Vitamina K, Vitamina A, Calcio." }
+        ],
+        "Domenica": [
+            { title: "Pancake Proteici con Frutta Fresca", image: "images/domenica_ricetta1.jpg", kcal: 380, p: 28, c: 40, g: 15, f: 5, ingredients: ["Proteine in polvere: 30g", "Farina d'avena: 50g", "Uovo: 1", "Latte: 100ml", "Frutta fresca: 100g"], shortProcedure: "Mescola proteine, farina, uovo e latte. Cuoci i pancake in padella. Servi con la frutta fresca.", fullProcedure: formatProcedureText("In una ciotola, mescola le proteine in polvere, la farina d'avena e il lievito (if used). Aggiungi l'uovo + il latte (e l'estratto di vaniglia, se usato). Mescola bene con una frusta o una spatola fino ad ottenere un impasto liscio e omogeneo. Non mescolare eccessivamente. Scalda una padella antiaderente a fuoco medio e ungila leggermente (con un tovagliolo di carta imbevuto d'olio). Versa un mestolino di impasto per ogni pancake. Cuoci per 2-3 minuti per lato, o finché non compaiono delle bollicelle sulla superficie e il pancake è dorato. Servi i pancake impilati e guarnisci con la frutta fresca tagliata."), micros: "Proteine complete, Antiossidanti." },
+            { title: "Pollo Freddo con Farro e Verdure Grigliate", image: "images/domenica_ricetta2.jpg", kcal: 470, p: 40, c: 45, g: 15, f: 9, ingredients: ["Petto di pollo grigliato (freddo): 200g", "Farro cotto: 100g", "Verdure grigliate: 200g", "Olio EVO: 1 cucchiaio"], shortProcedure: "Mescola il farro freddo con le verdure grigliate e il pollo a listarelle. Condisci con olio e limone.", fullProcedure: formatProcedureText("Cuoci il farro secondo le istruzioni sulla confezione (solitamente 1 parte di farro per 2-3 parti di acqua, bollire per 25-30 minuti, scolare). Lascialo raffreddare. Prepara le verdure grigliate: lava e taglia zucchine, melanzane e peperoni a fette o listarelle. Grigliale su una piastra ben calda o in forno finché non sono tenere e presentano i segni della griglia. Lasciale raffreddare. Taglia il petto di pollo grigliato (freddo) a listarelle o cubetti. In una ciotola capiente, unisci il farro freddo, le verdure grigliate and il pollo a listarelle. Condisci con olio extra vergine d'oliva, succo di limone, menta o basilico fresco tritato, sale e pepe. Mescola bene. Questo piatto è ottimo anche preparato in anticipo e conservato in frigorifero."), micros: "Fibre, Magnesio, Vitamina C." },
+            { title: "Pera e Ricotta Magra", image: "images/domenica_ricetta3.jpg", kcal: 150, p: 12, c: 18, g: 4, f: 3, ingredients: ["Pera: 1 media", "Ricotta magra: 100g"], shortProcedure: "Taglia la pera a spicchi e servila con la ricotta.", fullProcedure: formatProcedureText("Lava bene la pera. Tagliala a spicchi o cubetti. In una ciotola, metti la ricotta magra. Accompagna la ricotta con gli spicchi di pera. Puoi gustarli alternandoli o mescolandoli."), micros: "Calcio, Probiotici, Antiossidanti." },
+            { title: "Spezzatino di Manzo con Piselli e Patate", image: "images/domenica_ricetta4.jpg", kcal: 600, p: 45, c: 50, g: 25, f: 10, ingredients: ["Spezzatino di manzo magro: 200g", "Piselli: 100g", "Patate: 200g", "Soffritto misto: 80g", "Pomodori pelati: 200g"], shortProcedure: "Rosola la carne, aggiungi il soffritto e i pomodori e cuoci a fuoco lento. Addiungi patate e piselli verso fine cottura.", fullProcedure: formatProcedureText("Trita finemente cipolla, carota e sedano per il soffritto. In una pentola capiente o casseruola, scalda l'olio extra vergine d'oliva. Aggiungi i cubetti di manzo e falli rosolare su tutti i lati finché non sono ben dorati. Togli la carne dalla pentola e mettila da parte. Nella stessa pentola, aggiungi il trito di verdure e fai soffriggere a fuoco basso per 5-7 minuti, finché non sono morbide. Rimetti la carne nella pentola. Aggiungi i pomodori pelati, il brodo (o acqua) e il rametto di rosmarino/foglia di alloro. Porta a ebollizione, poi riduci la fiamma al minimo, copri e lascia sobbollire per circa 1 ora e 30 minuti - 2 ore, o finché la carne non è molto tenera. Aggiungi le patate sbucciate e tagliate a cubetti di medie dimensioni. Cuoci per altri 20-30 minuti, o finché le patate non sono tenere. Negli ultimi 10 minuti di cottura, aggiungi i piselli surgelati. Aggiusta di sale e pepe. Togli il rametto di rosmarino/alloro prima di servire."), micros: "Ferro, Vitamina B12, Potassio." }
+        ]
+    };
+
+    let currentDay = 'Lunedì';
+    const dayNavigation = document.getElementById('day-navigation');
+    const recipeContainer = document.getElementById('recipe-container');
+    const alternativeRecipeModal = document.getElementById('alternativeRecipeModal');
+    const alternativeRecipeCloseButton = alternativeRecipeModal.querySelector('.close-button'); // Get the close button for alternative modal
+    const alternativeRecipeContent = document.getElementById('alternativeRecipeContent');
+
+    // New elements for the recipe detail modal
+    const recipeDetailModal = document.getElementById('recipeDetailModal');
+    const recipeDetailCloseButton = recipeDetailModal.querySelector('.close-button'); // Get the close button for recipe detail modal
+    const recipeDetailModalContent = recipeDetailModal.querySelector('.modal-content'); // Get the content element for transitions
+    const recipeDetailTitle = document.getElementById('recipeDetailTitle');
+    const recipeDetailKcal = document.getElementById('recipeDetailKcal');
+    const recipeDetailIngredients = document.getElementById('recipeDetailIngredients');
+    const recipeDetailProcedure = document.getElementById('recipeDetailProcedure');
+    const recipeDetailProtein = document.getElementById('recipeDetailProtein');
+    const recipeDetailCarbs = document.getElementById('recipeDetailCarbs');
+    const recipeDetailFats = document.getElementById('recipeDetailFats');
+    const recipeDetailFibre = document.getElementById('recipeDetailFibre');
+    const recipeDetailMicros = document.getElementById('recipeDetailMicros');
+    const recipeDetailImage = document.getElementById('recipeDetailImage');
+    const suggestAlternativeBtnModal = document.getElementById('suggestAlternativeBtnModal');
+    const scrollIndicator = document.getElementById('scrollIndicator'); // Get the scroll indicator
+
+    // Reference to the mouseenter/mouseleave handlers to allow proper removal
+    let modalContentMouseEnterHandler = null;
+    let modalContentMouseLeaveHandler = null;
+
+
+    function calculateDailyTotals(day) {
+        return mealPlan[day].reduce((acc, meal) => {
+            acc.kcal += meal.kcal;
+            acc.p += meal.p;
+            acc.c += meal.c;
+            acc.g += meal.g;
+            acc.f += meal.f;
+            return acc;
+        }, { kcal: 0, p: 0, c: 0, g: 0, f: 0 });
+    }
+
+    function renderNavigation() {
+        Object.keys(mealPlan).forEach(day => {
+            const button = document.createElement('button');
+            button.textContent = day;
+            button.className = 'nav-button px-4 py-2 rounded-lg shadow-md text-stone-700 font-semibold';
+            if (day === currentDay) {
+                button.classList.add('active');
+            }
+            button.addEventListener('click', () => {
+                currentDay = day;
+                updateActiveButton();
+                renderRecipes(day);
+            });
+            dayNavigation.appendChild(button);
+        });
+    }
+
+    function updateActiveButton() {
+        const buttons = dayNavigation.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.textContent === currentDay) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    function renderRecipes(day) {
+        recipeContainer.innerHTML = '';
+        const dayPlan = mealPlan[day];
+        dayPlan.forEach((recipe) => {
+            const card = document.createElement('div');
+            card.className = 'recipe-card rounded-xl shadow-lg overflow-hidden cursor-pointer';
+            
+            // Create image element and set its properties
+            const imgElement = document.createElement('img');
+            imgElement.src = recipe.image;
+            imgElement.alt = recipe.title;
+            imgElement.className = 'w-20 h-20 object-cover rounded-lg mr-4';
+            imgElement.onerror = function() {
+                // Set the fallback image when an error occurs
+                this.onerror = null; // Prevents infinite loop if the fallback image also fails
+                this.src = PLACEHOLDER_IMG_SMALL;
+            };
+
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'recipe-card-header p-4 flex justify-between items-center';
+            
+            const flexDiv = document.createElement('div');
+            flexDiv.className = 'flex items-center';
+
+            const textDiv = document.createElement('div');
+            textDiv.innerHTML = `
+                <h4 class="text-lg font-bold text-stone-800">${recipe.title}</h4>
+                <p class="text-sm text-emerald-700 font-semibold">${recipe.kcal} kcal</p>
+            `;
+
+            flexDiv.appendChild(imgElement);
+            flexDiv.appendChild(textDiv);
+            headerDiv.appendChild(flexDiv);
+            card.appendChild(headerDiv);
+            
+            // Add click listener to open the modal
+            card.querySelector('.recipe-card-header').addEventListener('click', () => {
+                openRecipeDetailModal(recipe);
+            });
+            recipeContainer.appendChild(card);
+        });
+    }
+
+    // Function to update the scroll indicator's fixed position relative to the modal content
+    function updateScrollIndicatorPosition() {
+        // Only proceed if the modal is actually visible
+        if (!recipeDetailModal.classList.contains('show')) {
+            return;
+        }
+
+        const modalContentRect = recipeDetailModalContent.getBoundingClientRect();
+        const indicatorHeight = scrollIndicator.offsetHeight;
+        const indicatorWidth = scrollIndicator.offsetWidth;
+
+        // Calculate position to be anchored to the bottom of the modal-content card
+        // This makes the indicator fixed to the viewport, but dynamically positioned based on the modal's current viewport position
+        scrollIndicator.style.top = `${modalContentRect.bottom - indicatorHeight - 16}px`; // 16px from bottom of content
+        scrollIndicator.style.left = `${modalContentRect.left + (modalContentRect.width / 2) - (indicatorWidth / 2)}px`;
+
+        // Ensure the indicator is only shown if the content is scrollable and not at the very bottom
+        const { scrollTop, scrollHeight, clientHeight } = recipeDetailModalContent;
+        if (scrollHeight > clientHeight && (scrollTop + clientHeight < scrollHeight - 5)) {
+            // Check if the modal-content itself is being hovered or touched
+            const isModalContentHovered = recipeDetailModalContent.matches(':hover');
+            // On touch devices, there's no hover, so we assume it's "hovered" if there's scroll.
+            // A more robust solution for touch would involve touchstart/touchend events.
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+
+            if (isModalContentHovered || isTouchDevice) {
+                scrollIndicator.classList.remove('hidden');
+            } else {
+                 scrollIndicator.classList.add('hidden');
+            }
+        } else {
+            scrollIndicator.classList.add('hidden');
+        }
+    }
+
+    // Function to open the recipe detail modal
+    function openRecipeDetailModal(recipe) {
+        // Imposta i dati nel modal
+        recipeDetailTitle.textContent = recipe.title;
+        recipeDetailKcal.textContent = `${recipe.kcal} kcal`;
+
+        recipeDetailIngredients.innerHTML = '';
+        recipe.ingredients.forEach(ing => {
+            const li = document.createElement('li');
+            li.textContent = ing;
+            recipeDetailIngredients.appendChild(li);
+        });
+
+        recipeDetailProcedure.textContent = recipe.fullProcedure;
+        recipeDetailProtein.textContent = recipe.p;
+        recipeDetailCarbs.textContent = recipe.c;
+        recipeDetailFats.textContent = recipe.g;
+        recipeDetailFibre.textContent = recipe.f;
+        recipeDetailMicros.textContent = recipe.micros;
+        
+        // Directly set image source for the large modal image
+        recipeDetailImage.src = recipe.image.replace('80/80', '600/300').replace('images/', 'images/'); // Keep paths consistent or adjust as needed for large
+        recipeDetailImage.alt = `Immagine di ${recipe.title}`;
+        recipeDetailImage.onerror = () => { // Fallback in case the image fails to load
+            recipeDetailImage.src = PLACEHOLDER_IMG_LARGE;
+        };
+
+        // Passa le info per suggerimento alternativo (retained for LLM functionality)
+        suggestAlternativeBtnModal.dataset.originalRecipeTitle = recipe.title;
+        suggestAlternativeBtnModal.dataset.originalRecipeKcal = recipe.kcal;
+        suggestAlternativeBtnModal.dataset.originalRecipeP = recipe.p;
+        suggestAlternativeBtnModal.dataset.originalRecipeC = recipe.c;
+        suggestAlternativeBtnModal.dataset.originalRecipeG = recipe.g;
+        suggestAlternativeBtnModal.dataset.originalRecipeF = recipe.f;
+        suggestAlternativeBtnModal.dataset.originalRecipeProcedure = recipe.fullProcedure;
+
+
+        // Mostra il modal SENZA animazione ancora
+        recipeDetailModal.style.display = 'flex';
+
+        // Forza un reflow per far partire l'animazione
+        void recipeDetailModalContent.offsetWidth; // Use modal-content for reflow as it's the element with transitions
+
+        // Ora applica la classe che attiva l'animazione
+        recipeDetailModal.classList.add('show');
+        
+        // Reset scroll position to top when opening
+        recipeDetailModalContent.scrollTop = 0;
+
+        // Ensure scroll indicator is hidden initially when modal opens.
+        scrollIndicator.classList.add('hidden'); 
+
+        // Remove previous listeners to prevent duplicates
+        if (modalContentMouseEnterHandler && modalContentMouseLeaveHandler) {
+            recipeDetailModalContent.removeEventListener('mouseenter', modalContentMouseEnterHandler);
+            recipeDetailModalContent.removeEventListener('mouseleave', modalContentMouseLeaveHandler);
+        }
+
+        // Schedule position update and listener setup using requestAnimationFrame for better timing
+        requestAnimationFrame(() => {
+            updateScrollIndicatorPosition(); 
+            // Set up new listeners for non-touch devices
+            if (!('ontouchstart' in window)) { // Check if not touch and handlers aren't set
+                modalContentMouseEnterHandler = () => updateScrollIndicatorPosition();
+                modalContentMouseLeaveHandler = () => scrollIndicator.classList.add('hidden');
+                recipeDetailModalContent.addEventListener('mouseenter', modalContentMouseEnterHandler);
+                recipeDetailModalContent.addEventListener('mouseleave', modalContentMouseLeaveHandler);
+            }
+        });
+    }
+
+
+    // Event listener for the alternative recipe button inside the recipe detail modal
+    suggestAlternativeBtnModal.addEventListener('click', (event) => {
+        // Retrieve original recipe data from dataset attributes
+        const originalRecipe = {
+            title: event.target.dataset.originalRecipeTitle,
+            kcal: parseInt(event.target.dataset.originalRecipeKcal),
+            p: parseInt(event.target.dataset.originalRecipeP),
+            c: parseInt(event.target.dataset.originalRecipeC),
+            g: parseInt(event.target.dataset.originalRecipeG),
+            f: parseInt(event.target.dataset.originalRecipeF),
+            fullProcedure: event.target.dataset.originalRecipeProcedure
+        };
+
+        // Close the current recipe detail modal before opening the alternative one
+        recipeDetailModal.classList.remove('show');
+        scrollIndicator.classList.add('hidden'); // Immediately hide scroll indicator when opening alternative
+        suggestAlternativeRecipe(originalRecipe); // Pass the full original recipe object
+    });
+    
+    async function suggestAlternativeRecipe(originalRecipe) { // Now accepts originalRecipe object
+        alternativeRecipeModal.classList.add('show'); // Show the modal with transition
+        alternativeRecipeContent.innerHTML = '<p class="text-center py-4">Generando ricetta alternativa... ✨</p>';
+
+        const prompt = `Suggeriscimi una ricetta alternativa a '${originalRecipe.title}' che abbia un profilo nutrizionale simile (Kcal: ${originalRecipe.kcal}, P: ${originalRecipe.p}g, C: ${originalRecipe.c}g, G: ${originalRecipe.g}g, F: ${originalRecipe.f}g) e ingredienti e/o metodi di cottura differenti. La ricetta originale prevede: ${originalRecipe.fullProcedure}. La ricetta alternativa deve essere senza pesce. Forniscimi la risposta in formato JSON con i seguenti campi: "recipeName" (string), "ingredients" (array of strings like 'Ingrediente: quantità'), "procedure" (string), "estimatedMacros" (object with "kcal", "p", "c", "g", "f" as numbers), "micros" (string describing key micronutrients). Assicurati che le quantità degli ingredienti siano realistiche e che i macronutrienti stimati siano vicini a quelli richiesti.`;
+
+        const payload = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        "recipeName": { "type": "STRING" },
+                        "ingredients": { "type": "ARRAY", "items": { "type": "STRING" } },
+                        "procedure": { "type": "STRING" },
+                        "estimatedMacros": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "kcal": { "type": "NUMBER" },
+                                "p": { "type": "NUMBER" },
+                                "c": { "type": "NUMBER" },
+                                "g": { "type": "NUMBER" },
+                                "f": { "type": "NUMBER" }
+                            }
+                        },
+                        "micros": { "type": "STRING" }
+                    },
+                    "required": ["recipeName", "ingredients", "procedure", "estimatedMacros", "micros"]
+                }
+            }
+        };
+
+        try {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                console.error(`API Error for alternative recipe: ${response.status} ${response.statusText}`);
+                alternativeRecipeContent.innerHTML = '<p class="text-center py-4 text-red-600">Errore API nella generazione della ricetta alternativa. Riprova più tardi.</p>';
+                return;
+            }
+            
+            const result = await response.json();
+
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                
+                const jsonText = result.candidates[0].content.parts[0].text;
+                const newRecipe = JSON.parse(jsonText);
+
+                alternativeRecipeContent.innerHTML = `
+                    <h4 class="text-xl font-bold text-stone-800 mb-2">${newRecipe.recipeName}</h4>
+                    <h5 class="font-bold mb-1 text-stone-700">Ingredienti:</h5>
+                    <ul class="list-disc list-inside text-stone-600 mb-3">
+                        ${newRecipe.ingredients.map(ing => `<li>${ing}</li>`).join('')}
+                    </ul>
+                    <h5 class="font-bold mb-1 text-stone-700">Procedimento:</h5>
+                    <p class="text-stone-600 mb-3">${formatProcedureText(newRecipe.procedure)}</p>
+                    <h5 class="font-bold mb-1 text-stone-700">Macronutrienti Stimati:</h5>
+                    <table class="w-full text-sm text-left text-stone-500 mb-3">
+                        <thead class="text-xs text-stone-700 uppercase bg-stone-100">
+                            <tr>
+                                <th scope="col" class="px-2 py-1">Kcal</th>
+                                <th scope="col" class="px-2 py-1">Proteine (g)</th>
+                                <th scope="col" class="px-2 py-1">Carboidrati (g)</th>
+                                <th scope="col" class="px-2 py-1">Grassi (g)</th>
+                                <th scope="col" class="px-2 py-1">Fibre (g)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="bg-white">
+                                <td class="px-2 py-1 font-medium">${newRecipe.estimatedMacros.kcal || 'N/A'}</td>
+                                <td class="px-2 py-1 font-medium">${newRecipe.estimatedMacros.p || 'N/A'}</td>
+                                <td class="px-2 py-1 font-medium">${newRecipe.estimatedMacros.c || 'N/A'}</td>
+                                <td class="px-2 py-1 font-medium">${newRecipe.estimatedMacros.g || 'N/A'}</td>
+                                <td class="px-2 py-1 font-medium">${newRecipe.estimatedMacros.f || 'N/A'}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <h5 class="font-bold mb-1 text-stone-700">Micronutrienti Chiave:</h5>
+                    <p class="text-sm text-stone-600">${newRecipe.micros || 'Non specificato.'}</p>
+                `;
+            } else {
+                alternativeRecipeContent.innerHTML = '<p class="text-center py-4">Impossibile generare una ricetta alternativa. Riprova più tardi.</p>';
+            }
+        } catch (error) {
+            console.error('Errore nella chiamata API per ricetta alternativa o parsing JSON:', error);
+            alternativeRecipeContent.innerHTML = '<p class="text-center py-4 text-red-600">Errore nella generazione della ricetta. Controlla la console per dettagli.</p>';
+        }
+    }
+
+    // Event listener for recipe detail modal scrolling
+    recipeDetailModalContent.addEventListener('scroll', updateScrollIndicatorPosition);
+
+    // Event listener for window resize to update scroll indicator position
+    window.addEventListener('resize', () => {
+        if (recipeDetailModal.classList.contains('show')) { // Only update if the modal is currently open
+            updateScrollIndicatorPosition();
+        }
+    });
+
+    /* Event listeners for modals */
+    recipeDetailCloseButton.addEventListener('click', () => {
+        recipeDetailModal.classList.remove('show'); // Trigger exit animation
+        scrollIndicator.classList.add('hidden'); // Immediately hide scroll indicator on close click
+        // Remove hover/mouseleave listeners on modal close
+        if (modalContentMouseEnterHandler && modalContentMouseLeaveHandler) {
+            recipeDetailModalContent.removeEventListener('mouseenter', modalContentMouseEnterHandler);
+            modalContentMouseEnterHandler = null; // Clear references
+            recipeDetailModalContent.removeEventListener('mouseleave', modalContentMouseLeaveHandler);
+            modalContentMouseLeaveHandler = null;
+        }
+    });
+
+    // Handle transition end for recipe detail modal to set display: none
+    recipeDetailModalContent.addEventListener('transitionend', (event) => {
+        // Ensure it's the opacity/transform transition ending on the content, not a child
+        if (event.propertyName === 'opacity' && !recipeDetailModal.classList.contains('show')) {
+            recipeDetailModal.style.display = 'none';
+            // Reset scroll position when closed, so it opens at top next time
+            recipeDetailModalContent.scrollTop = 0;
+        }
+    });
+
+    alternativeRecipeCloseButton.addEventListener('click', () => {
+        alternativeRecipeModal.classList.remove('show'); // Trigger exit animation
+    });
+
+    // Handle transition end for alternative recipe modal to set display: none
+    const alternativeRecipeModalContent = alternativeRecipeModal.querySelector('.modal-content');
+    alternativeRecipeModalContent.addEventListener('transitionend', (event) => {
+        if (event.propertyName === 'opacity' && !alternativeRecipeModal.classList.contains('show')) {
+            alternativeRecipeModal.style.display = 'none';
+        }
+    });
+
+    window.addEventListener('click', (event) => {
+        // Only close if the click is directly on the modal overlay, not its content
+        if (event.target === recipeDetailModal) {
+            recipeDetailModal.classList.remove('show');
+            scrollIndicator.classList.add('hidden'); // Hide on outside click close
+            // Remove hover/mouseleave listeners on outside click close
+            if (modalContentMouseEnterHandler && modalContentMouseLeaveHandler) {
+                recipeDetailModalContent.removeEventListener('mouseenter', modalContentMouseEnterHandler);
+                modalContentMouseEnterHandler = null;
+                modalContentMouseLeaveHandler = null;
+            }
+        }
+        if (event.target === alternativeRecipeModal) {
+            alternativeRecipeModal.classList.remove('show');
+        }
+    });
+    renderNavigation();
+    renderRecipes(currentDay);
+});
+</script>
+</body>
+</html>
